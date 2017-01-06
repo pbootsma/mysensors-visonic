@@ -9,9 +9,11 @@
   Protocolo info: http://www.domoticaforum.eu/viewtopic.php?f=68&t=6581
 */
 
+#define MY_RADIO_NRF24
+
 #include <SoftwareSerial.h>
 #include <SPI.h>
-#include <MySensor.h>
+#include <MySensors.h>
 #include <avr/wdt.h>
 #include "Visonic.h"
 
@@ -30,7 +32,6 @@ Visonic visonic(VISONIC_RX_PIN, VISONIC_TX_PIN);
 
 #define MYSENSORS_USERPIN_STATE_ADDRESS 0
 
-MySensor gw;
 MyMessage msgArmed(MYSENSORS_ARMED_ID, V_STATUS);
 MyMessage msgArmedHome(MYSENSORS_ARMED_HOME_ID, V_STATUS);
 MyMessage msgArmedAway(MYSENSORS_ARMED_AWAY_ID, V_STATUS);
@@ -47,37 +48,38 @@ void setup()
 	// Save userpin in eeprom once, after that change pincode and comment saveState lines 
 	// In this way the user pin does not have to be in code
 	// 0x12 and 0x34 gives user pin 1234
-	//gw.saveState(MYSENSORS_USERPIN_STATE_ADDRESS, 0x12);
-	//gw.saveState(MYSENSORS_USERPIN_STATE_ADDRESS + 1, 0x34);
+	//saveState(MYSENSORS_USERPIN_STATE_ADDRESS, 0x12);
+	//saveState(MYSENSORS_USERPIN_STATE_ADDRESS + 1, 0x34);
 	
 	// Load userPin from eeprom
 	unsigned int userPin = 
-		gw.loadState(MYSENSORS_USERPIN_STATE_ADDRESS) << 8
-		| gw.loadState(MYSENSORS_USERPIN_STATE_ADDRESS + 1);
+		loadState(MYSENSORS_USERPIN_STATE_ADDRESS) << 8
+		| loadState(MYSENSORS_USERPIN_STATE_ADDRESS + 1);
 	visonic.logDebug = true;
 	visonic.begin(userPin, visonicEvent);
-	
-	gw.begin(handleMySensorsMessage);
 
-	// Send the Sketch Version Information to the Gateway
-	gw.sendSketchInfo("Alarm", "1.0");
-
-	// Register primary sensors to gw
-	gw.present(MYSENSORS_ARMED_ID, S_BINARY, "Armed");
-	gw.present(MYSENSORS_ARMED_HOME_ID, S_BINARY, "Armed Home");
-	gw.present(MYSENSORS_ARMED_AWAY_ID, S_BINARY, "Armed Away");
-	gw.present(MYSENSORS_ALARM_ID, S_BINARY, "Alarm");
-	
 	// Enable watchdog timer of 8 seconds
 	wdt_enable(WDTO_8S);
+}
+
+void presentation()
+{
+  // Send the Sketch Version Information to the Gateway
+  sendSketchInfo("Alarm", "1.0");
+
+  // Register primary sensors to gw
+  present(MYSENSORS_ARMED_ID, S_BINARY, "Armed");
+  present(MYSENSORS_ARMED_HOME_ID, S_BINARY, "Armed Home");
+  present(MYSENSORS_ARMED_AWAY_ID, S_BINARY, "Armed Away");
+  present(MYSENSORS_ALARM_ID, S_BINARY, "Alarm");
+
+  // Should resend zones
 }
 
 void loop()
 {
 	// Reset watchdog timer
 	wdt_reset(); 
-	// Process MySensors
-	gw.process();
 	// Process Visonic
 	visonic.process(); 	
 }
@@ -102,21 +104,21 @@ void visonicEvent(int eventType, int zone) {
 			// Uncommented to get battery low
 			// Serial.print(F("Zone battery low: "));
 			// Serial.println(zone);
-			// gw.send(msgZoneStatus.setSensor(30 + zone).set(true));
+			// send(msgZoneStatus.setSensor(30 + zone).set(true));
 			break;
 		case VISONIC_EVENT_ZONE_BATTERY_OK:
 			// Uncommented to get battery low
 			// Serial.println(F("Zone battery ok: "));
 			// Serial.println(zone);
-			// gw.send(msgZoneStatus.setSensor(30 + zone).set(false));
+			// send(msgZoneStatus.setSensor(30 + zone).set(false));
 			break;
 		case VISONIC_EVENT_ZONE_ENROLLED:
 			Serial.print(F("Zone Enrolled: "));
 			Serial.println(zone);
-			gw.present(zone, S_BINARY, "Zone");
+			present(zone, S_BINARY, "Zone");
 			// Uncommented to get battery low
-			// gw.present(30 + zone, S_BINARY, "Zone Battery");
-			// gw.present(30 + zone, S_BINARY, "Zone Tamper");
+			// present(30 + zone, S_BINARY, "Zone Battery");
+			// present(30 + zone, S_BINARY, "Zone Tamper");
 			break;
 		case VISONIC_EVENT_ZONE_BYPASSED:
 			Serial.print(F("Zone Bypassed: "));
@@ -125,35 +127,35 @@ void visonicEvent(int eventType, int zone) {
 		case VISONIC_EVENT_ZONE_OPEN:
 			Serial.print(F("Zone Open: "));
 			Serial.println(zone);
-			gw.send(msgZoneStatus.setSensor(zone).set(true));
+			send(msgZoneStatus.setSensor(zone).set(true));
 			break;
 		case VISONIC_EVENT_ZONE_MOTION:
 			Serial.print(F("Zone Motion: "));
 			Serial.println(zone);
-			gw.send(msgZoneStatus.setSensor(zone).set(true));
+			send(msgZoneStatus.setSensor(zone).set(true));
 			break;
 		case VISONIC_EVENT_ZONE_CLOSED:
 			Serial.print(F("Zone Closed: "));
 			Serial.println(zone);
-			gw.send(msgZoneStatus.setSensor(zone).set(false));
+			send(msgZoneStatus.setSensor(zone).set(false));
 			break;
 		case VISONIC_EVENT_DISARMED:
 			Serial.println(F("Disarmed"));
-			gw.send(msgArmed.set(false));
-			gw.send(msgArmedHome.set(false));
-			gw.send(msgArmedAway.set(false));
+			send(msgArmed.set(false));
+			send(msgArmedHome.set(false));
+			send(msgArmedAway.set(false));
 			break;
 		case VISONIC_EVENT_ARMED_HOME_EXIT_DELAY:
 			Serial.println(F("Armed home exit delay"));
-			gw.send(msgArmed.set(true));
-			gw.send(msgArmedHome.set(true));
-			gw.send(msgArmedAway.set(false));
+			send(msgArmed.set(true));
+			send(msgArmedHome.set(true));
+			send(msgArmedAway.set(false));
 			break;
 		case VISONIC_EVENT_ARMED_AWAY_EXIT_DELAY:
 			Serial.println(F("Armed away exit delay"));
-			gw.send(msgArmed.set(true));
-			gw.send(msgArmedHome.set(false));
-			gw.send(msgArmedAway.set(true));
+			send(msgArmed.set(true));
+			send(msgArmedHome.set(false));
+			send(msgArmedAway.set(true));
 			break;
 		case VISONIC_EVENT_ARMED_HOME:
 			Serial.println(F("Armed home"));
@@ -163,11 +165,11 @@ void visonicEvent(int eventType, int zone) {
 			break;
 		case VISONIC_EVENT_ALARM:
 			Serial.println(F("Alarm"));
-			gw.send(msgAlarm.set(true));
+			send(msgAlarm.set(true));
 			break;
 		case VISONIC_EVENT_ALARM_END:
 			Serial.println(F("Alarm End"));
-			gw.send(msgAlarm.set(false));
+			send(msgAlarm.set(false));
 			break;
 	}
 }
@@ -175,7 +177,8 @@ void visonicEvent(int eventType, int zone) {
 /*
  * Message handling from MySensors
  */
-void handleMySensorsMessage(const MyMessage &message) {
+void receive(const MyMessage &message) 
+{
 	switch (message.sensor) {
 		case MYSENSORS_ARMED_ID:
 			if (message.type == V_STATUS) {
